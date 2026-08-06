@@ -212348,7 +212348,7 @@ body,
       { id: 'daily_question_rate', pattern: /每日一问|互动率/ },
       { id: 'main_course_rate', pattern: /主课|学习率/ },
       { id: 'homework_rate', pattern: /作业/ },
-      { id: 'ltv', pattern: /LTV|人均价值/i }, { id: 'cac', pattern: /CAC|获客成本/i },
+      { id: 'ltv', pattern: /ltv|LTV|人均价值/i }, { id: 'cac', pattern: /CAC|获客成本/i },
       { id: 'L2-004', pattern: /营收|收入/ }, { id: 'orders', pattern: /订单/ },
       { id: 'students', pattern: /学员|规模/ }, { id: 'cost', pattern: /招生费用|投入/ }
     ];
@@ -212359,7 +212359,7 @@ body,
 
   var HISTORY_REFERENCE = window.HISTORY_REFERENCE || {};
   var HISTORY_METRIC_ALIASES = [
-    { id: 'ltv', pattern: /LTV|人均价值|客单/ },
+    { id: 'ltv', pattern: /ltv|LTV|人均价值|客单/i },
     { id: 'quota', pattern: /原始配额|配额|规模|人数/ },
     { id: 'ltv_quota', pattern: /LTV配额|计算分母|分母/ },
     { id: 'old_student_count', pattern: /老学员|老生/ },
@@ -212620,7 +212620,7 @@ body,
       return {
         compact: true,
         period: context.period || '焦妈历史', day: context.day || 'all', supported: true,
-        conclusion: '焦妈训练营历史参考库已接入问答模块，可查询2.0/3.0的营期、LTV、触达、学习和转化指标。',
+        conclusion: '焦妈训练营历史参考库已接入问答模块，可查询1.0/2.0/3.0及具体营期（如55期）的LTV、直播、触达、学习和转化指标。',
         actual: '覆盖' + historyList('facts').length + '条facts、' + historyList('periods').length + '个营期、' +
           historyList('metric_definitions').length + '个指标定义',
         target: periodText || '当前条件下未筛到营期',
