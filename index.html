@@ -209125,7 +209125,7 @@ body,
 
   function directEntryRoute() {
     return {
-      period: '602',
+      period: defaultPeriodId(),
       day: 'all',
       module: 'overview',
       view: 'home',
@@ -212378,7 +212378,19 @@ body,
     { id: 'conversion_rate', pattern: /转化率|转化/ },
     { id: 'overall_upgrade_rate', pattern: /进阶率|升级率|整体升级/ },
     { id: 'overall_upgrade_count', pattern: /进阶人数|升级人数/ },
-    { id: 'deposit_amount', pattern: /定金金额|定金/ }
+    { id: 'deposit_amount', pattern: /定金金额|定金/ },
+    { id: 'live_camp_size', pattern: /直播.*营期人数|直播规模/ },
+    { id: 'live_reserved_count', pattern: /预约人数|预约数/ },
+    { id: 'live_reservation_rate', pattern: /预约率/ },
+    { id: 'live_realtime_peak', pattern: /峰值|最高在线|实时在线峰值/ },
+    { id: 'live_total_viewers_final', pattern: /累计观看|总观看|观看人数/ },
+    { id: 'live_watch_coverage_rate', pattern: /观看覆盖率|覆盖率/ },
+    { id: 'live_interaction_count', pattern: /新增互动|新增评论|互动人数|评论人数/ },
+    { id: 'live_interaction_rate', pattern: /互动率|活动率/ },
+    { id: 'live_stay_seconds', pattern: /停留|停留时长|观看时长/ },
+    { id: 'live_reminder_traffic', pattern: /开播提醒|提醒流量/ },
+    { id: 'live_recommend_traffic', pattern: /直播推荐|推荐流量/ },
+    { id: 'live_share_traffic', pattern: /分享流量|分享/ }
   ];
 
   function historyList(name) {
@@ -212395,12 +212407,12 @@ body,
   }
 
   function historyPeriodFromText(text) {
-    var match = String(text || '').match(/(?:^|[^\d])((?:7[4-7])|(?:78[1-3])|(?:79[12])|(?:80[1-3])|811)期?/);
+    var match = String(text || '').match(/(?:^|[^\d])((?:78[1-9])|(?:79\d)|(?:80\d)|(?:81[01])|(?:[1-6]\d)|(?:7[0-7])|(?:[1-9]))期/);
     return match ? match[1] + '期' : null;
   }
 
   function historyVersionFromText(text) {
-    var match = String(text || '').match(/([23])\.0/);
+    var match = String(text || '').match(/([123])\.0/);
     return match ? match[1] + '.0' : null;
   }
 
@@ -212410,13 +212422,21 @@ body,
   }
 
   function historyMetricFromText(text) {
+    text = String(text || '');
+    var liveText = /直播|小灶|硬广|返场|第八课/.test(text);
+    if (liveText) {
+      var liveAlias = HISTORY_METRIC_ALIASES.find(function (item) {
+        return String(item.id || '').indexOf('live_') === 0 && item.pattern.test(text);
+      });
+      if (liveAlias) return liveAlias.id;
+    }
     var alias = HISTORY_METRIC_ALIASES.find(function (item) { return item.pattern.test(text); });
     return alias ? alias.id : null;
   }
 
   function isHistoryQuestion(text) {
     text = String(text || '');
-    return /焦妈|历史|过往|沉淀|2\.0|3\.0/.test(text) || !!historyPeriodFromText(text);
+    return /焦妈|历史|过往|沉淀|1\.0|2\.0|3\.0|小灶|硬广|返场|第八课/.test(text) || !!historyPeriodFromText(text);
   }
 
   function historyFormatValue(value, metricId, unit) {
@@ -212424,7 +212444,7 @@ body,
     unit = unit || historyMetricInfo(metricId).unit || '';
     if (number == null) return value == null ? '-' : String(value);
     if (unit === '%') {
-      var pctValue = Math.abs(number) <= 1 ? number * 100 : number;
+      var pctValue = Math.abs(number) <= 2 ? number * 100 : number;
       return pctValue.toFixed(1).replace(/\.0$/, '') + '%';
     }
     if (/元/.test(unit)) return number.toFixed(1).replace(/\.0$/, '') + unit;
@@ -212452,14 +212472,111 @@ body,
     return rows.length + '条口径校验提示：历史原表率与当前分母重算存在差异，回答时需确认历史口径。';
   }
 
+  function historyLiveStagesFromText(text) {
+    text = String(text || '');
+    if (/第一场|第1场|开营直播|开营/.test(text)) return ['开营直播'];
+    if (/第二场|第2场|硬广/.test(text)) return ['硬广'];
+    if (/第三场|第3场|小灶/.test(text)) return ['小灶课'];
+    if (/第四场|第4场|隐藏第八课|第八课|返场|答疑/.test(text)) return ['隐藏第八课/返场答疑'];
+    if (/两场|2场/.test(text)) return ['开营直播', '硬广'];
+    if (/四场|4场|全部直播|所有直播/.test(text)) return ['开营直播', '硬广', '小灶课', '隐藏第八课/返场答疑'];
+    return null;
+  }
+
+  var HISTORY_LIVE_METRIC_ORDER = [
+    'live_camp_size', 'live_reserved_count', 'live_reservation_rate', 'live_realtime_peak',
+    'live_total_viewers_final', 'live_watch_coverage_rate', 'live_interaction_count',
+    'live_interaction_rate', 'live_stay_seconds', 'live_reminder_traffic',
+    'live_recommend_traffic', 'live_share_traffic'
+  ];
+
+  function isHistoryLiveMetric(metricId) {
+    return HISTORY_LIVE_METRIC_ORDER.includes(metricId);
+  }
+
+  function historyLiveRows(context) {
+    var stages = context.liveStages;
+    return historyList('facts').filter(function (fact) {
+      if (fact.project_name !== '焦妈训练营') return false;
+      if (fact.dimension_type !== 'live_stage') return false;
+      if (context.version && fact.operation_version !== context.version) return false;
+      if (context.period && fact.period_id !== context.period) return false;
+      if (context.metricId && fact.metric_id !== context.metricId) return false;
+      if (stages && !stages.includes(fact.dimension_name)) return false;
+      return true;
+    });
+  }
+
+  function historyLiveMetricLine(rows, metricId, labelPrefix) {
+    var metricRows = rows.filter(function (fact) { return fact.metric_id === metricId && fact.value != null; });
+    if (!metricRows.length) return null;
+    var values = metricRows.map(function (fact) { return finite(fact.value); }).filter(function (value) { return value != null; });
+    if (!values.length) return null;
+    var avg = values.reduce(function (sum, value) { return sum + value; }, 0) / values.length;
+    return (labelPrefix || '') + historyMetricName(metricId) + '：' +
+      historyFormatValue(avg, metricId, metricRows[0].unit) +
+      (metricRows.length > 1 ? '（' + metricRows.length + '条平均）' : '');
+  }
+
+  function historyLiveStageSummary(rows) {
+    var grouped = {};
+    rows.forEach(function (fact) {
+      var key = [fact.period_id, fact.dimension_name, fact.day_key].join('|');
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(fact);
+    });
+    return Object.keys(grouped).slice(0, 8).map(function (key) {
+      var group = grouped[key];
+      var sample = group[0] || {};
+      var metrics = ['live_total_viewers_final', 'live_realtime_peak', 'live_watch_coverage_rate', 'live_interaction_rate', 'live_stay_seconds']
+        .map(function (metricId) { return historyLiveMetricLine(group, metricId); })
+        .filter(Boolean)
+        .join('；');
+      return [sample.period_id, sample.dimension_name, sample.day_key].filter(Boolean).join(' ') + '：' + metrics;
+    });
+  }
+
+  function answerForHistoryLiveQuestion(context, route) {
+    var rows = historyLiveRows(context);
+    if (!rows.length) return null;
+    var href = routeHash(routeWith(route, { module: 'ask', view: 'recommended', params: {} }));
+    var metricIds = context.metricId ? [context.metricId] :
+      ['live_total_viewers_final', 'live_realtime_peak', 'live_watch_coverage_rate', 'live_interaction_rate', 'live_stay_seconds'];
+    var title = '焦妈训练营' + (context.version || '') + (context.period ? context.period : '') +
+      (context.liveStages ? context.liveStages.join('、') : '直播') + '数据';
+    if (context.wantsAverage || !context.period || context.liveStages && context.liveStages.length > 1) {
+      var details = metricIds.map(function (metricId) { return historyLiveMetricLine(rows, metricId); }).filter(Boolean);
+      return {
+        compact: true, period: context.period || context.version || '焦妈历史', day: 'all', supported: true,
+        conclusion: title + '平均表现：',
+        details: details.concat(['覆盖' + rows.length + '条直播场次事实；互动率优先使用修正口径=本时间段新增评论人数/实时在线人数。']),
+        actual: details.join('；'), target: '历史参考，无目标达成口径',
+        achievement: '按命中直播场次直接求均值', comparison: '',
+        breakdown: HISTORY_REFERENCE.boundary_note || '', action: '', href: href
+      };
+    }
+    var lines = historyLiveStageSummary(rows);
+    return {
+      compact: true, period: context.period || '焦妈历史', day: 'all', supported: true,
+      conclusion: title + '：',
+      details: lines.concat(['互动率优先使用修正口径=本时间段新增评论人数/实时在线人数。']),
+      actual: lines.join('；'), target: '历史参考，无目标达成口径',
+      achievement: '焦妈历史直播数据已整理', comparison: '',
+      breakdown: HISTORY_REFERENCE.boundary_note || '', action: '', href: href
+    };
+  }
+
   function historyContext(question) {
     var text = String(question || '');
+    var metricId = historyMetricFromText(text);
     return {
       text: text,
       period: historyPeriodFromText(text),
       version: historyVersionFromText(text),
       day: historyDayFromText(text),
-      metricId: historyMetricFromText(text),
+      metricId: metricId,
+      wantsLive: /直播|小灶|硬广|返场|第八课/.test(text) || isHistoryLiveMetric(metricId),
+      liveStages: historyLiveStagesFromText(text),
       wantsAverage: /平均|均值|整体|总体/.test(text),
       wantsLowest: /最低|最差|最低的|最小/.test(text),
       wantsHighest: /最高|最好|最高的|最大/.test(text)
@@ -212480,6 +212597,8 @@ body,
   function answerForHistoryQuestion(question, route) {
     if (!isHistoryQuestion(question)) return null;
     var context = historyContext(question);
+    var liveAnswer = context.wantsLive ? answerForHistoryLiveQuestion(context, route) : null;
+    if (liveAnswer) return liveAnswer;
     var rows = historyFacts(context);
     var periods = historyList('periods').filter(function (period) {
       return (!context.version || period.operation_version === context.version) &&
@@ -212491,6 +212610,7 @@ body,
         return period.operation_version + ' ' + period.period_id;
       }).join('、');
       return {
+        compact: true,
         period: context.period || '焦妈历史', day: context.day || 'all', supported: true,
         conclusion: '焦妈训练营历史参考库已接入问答模块，可查询2.0/3.0的营期、LTV、触达、学习和转化指标。',
         actual: '覆盖' + historyList('facts').length + '条facts、' + historyList('periods').length + '个营期、' +
@@ -212509,6 +212629,7 @@ body,
     });
     if (!metricRows.length) {
       return {
+        compact: true,
         period: context.period || '焦妈历史', day: context.day || 'all', supported: false,
         conclusion: '历史参考库中暂未命中“' + historyMetricName(context.metricId) + '”的同口径事实。',
         actual: '未命中',
@@ -212529,6 +212650,7 @@ body,
         return historyFactLabel(fact) + ' ' + historyFormatValue(fact.value, fact.metric_id, fact.unit);
       }).join('；');
       return {
+        compact: true,
         period: context.version || '焦妈历史', day: 'all', supported: !!values.length,
         conclusion: '焦妈训练营' + (context.version || '') + historyMetricName(context.metricId) + '平均为' +
           historyFormatValue(avg, context.metricId, averageRows[0] && averageRows[0].unit) + '。',
@@ -212557,6 +212679,7 @@ body,
       return historyFactLabel(fact) + ' ' + historyFormatValue(fact.value, fact.metric_id, fact.unit);
     }).join('；');
     return {
+        compact: true,
       period: context.period || picked.period_id || '焦妈历史', day: context.day || picked.day_key || 'all', supported: true,
       conclusion: historyFactLabel(picked) + '的' + historyMetricName(context.metricId) + '为' +
         historyFormatValue(picked.value, picked.metric_id, picked.unit) + '。',
@@ -212698,6 +212821,12 @@ body,
   }
 
   function answerMarkup(answer) {
+    if (answer.compact) {
+      var detailLines = Array.isArray(answer.details) ? answer.details : [];
+      return '<div class="answer-grid"><div class="answer-item conclusion"><span>回答</span><strong>' +
+        copy(answer.conclusion) + (detailLines.length ? '<br>' + detailLines.map(copy).join('<br>') : '') +
+        '</strong></div></div>';
+    }
     var fields = [
       ['实际', answer.actual], ['目标', answer.target], ['达成', answer.achievement],
       ['同期与前日', answer.comparison], ['关键拆解', answer.breakdown], ['建议动作', answer.action]
@@ -213015,7 +213144,7 @@ body,
   function normalizeRoute(route) {
     var periods = selectablePeriods().map(function (period) { return String(period.period_id); });
     var days = visibleDays().map(function (day) { return day.day_key; });
-    if (!periods.includes(String(route.period))) route.period = periods[0] || '601';
+    if (!periods.includes(String(route.period))) route.period = defaultPeriodId();
     if (!days.includes(route.day)) route.day = 'all';
     return route;
   }
