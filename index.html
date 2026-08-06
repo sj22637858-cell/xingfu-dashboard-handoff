@@ -209108,7 +209108,13 @@ body,
 
   function defaultPeriodId() {
     var allowed = selectablePeriods().map(function (period) { return period.period_id; });
-    var candidates = [DATA.metadata.default_period, DATA.metadata.current_period_id, '602'];
+    var dataPeriods = selectablePeriods().filter(function (period) {
+      return !['empty_shell', 'comparison_only', 'hidden', 'baseline_only', 'hidden_fixture_baseline'].includes(period.mode);
+    });
+    var latestDataPeriod = dataPeriods
+      .map(function (period) { return String(period.period_id); })
+      .sort(function (left, right) { return Number(right) - Number(left); })[0];
+    var candidates = [latestDataPeriod, DATA.metadata.current_period_id, DATA.metadata.default_period, '602'];
     for (var index = 0; index < candidates.length; index += 1) {
       if (allowed.includes(String(candidates[index] || ''))) return String(candidates[index]);
     }
@@ -212546,10 +212552,12 @@ body,
       (context.liveStages ? context.liveStages.join('、') : '直播') + '数据';
     if (context.wantsAverage || !context.period || context.liveStages && context.liveStages.length > 1) {
       var details = metricIds.map(function (metricId) { return historyLiveMetricLine(rows, metricId); }).filter(Boolean);
+      var stageLines = historyLiveStageSummary(rows);
       return {
         compact: true, period: context.period || context.version || '焦妈历史', day: 'all', supported: true,
         conclusion: title + '平均表现：',
-        details: details.concat(['覆盖' + rows.length + '条直播场次事实；互动率优先使用修正口径=本时间段新增评论人数/实时在线人数。']),
+        details: details.concat(stageLines.length ? ['明细：'].concat(stageLines) : [])
+          .concat(['覆盖' + rows.length + '条直播场次事实；互动率优先使用修正口径=本时间段新增评论人数/实时在线人数。']),
         actual: details.join('；'), target: '历史参考，无目标达成口径',
         achievement: '按命中直播场次直接求均值', comparison: '',
         breakdown: HISTORY_REFERENCE.boundary_note || '', action: '', href: href
