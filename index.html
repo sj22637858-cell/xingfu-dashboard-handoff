@@ -211974,11 +211974,30 @@ body,
     var rows = contextReadouts(route, ['ltv', 'revenue', 'orders', 'students', 'cac', 'cost', 'main_course_rate', 'daily_question_rate']).map(function (item) {
       return { item: item, comparison: comparisonFor(item.readout, item.actual) };
     }).filter(function (row) { return row.comparison; });
+    [
+      { metricId: 'live_attendance_rate', dayKey: 'D4', label: '第一场直播到课率' },
+      { metricId: 'live_completion_rate', dayKey: 'D4', label: '第一场直播完课率' },
+      { metricId: 'L3-011', dayKey: 'all', label: '整体转化率' }
+    ].forEach(function (spec) {
+      var fact = C.latestFact({
+        period_id: String(route.period),
+        day_key: spec.dayKey,
+        metric_id: spec.metricId,
+        dimension_type: 'all'
+      });
+      var comparison = comparisonFor(fact);
+      if (fact && comparison) {
+        rows.push({
+          item: { metricId: spec.metricId, actual: fact, label: spec.label },
+          comparison: comparison
+        });
+      }
+    });
     return '<section>' + sectionHead('营期对比', contextLabel(route) + '对比' + previousPeriodLabel(route) + '，全部对齐同一阶段') +
       (rows.length ? '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>指标</th><th>当前实际</th><th>' +
         copy(previousPeriodLabel(route)) + '</th><th>变化</th><th>动作</th></tr></thead><tbody>' + rows.map(function (row) {
           var baseline = firstNumber(row.comparison, ['baseline', 'baseline_value', 'previous']);
-          return '<tr><td><strong>' + copy(metricName(row.item.metricId)) + '</strong></td><td>' +
+          return '<tr><td><strong>' + copy(row.item.label || metricName(row.item.metricId)) + '</strong></td><td>' +
             copy(formatPlain(row.item.actual.value, row.item.metricId)) + '</td><td>' +
             copy(baseline == null ? '同阶段已纳入' : formatPlain(baseline, row.item.metricId)) + '</td><td>' +
             copy(periodComparisonText(row.comparison, row.item.metricId, route)) + '</td><td>' + copy(themeFor(route.day).action) + '</td></tr>';
