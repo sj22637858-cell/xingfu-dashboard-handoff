@@ -211007,6 +211007,17 @@ body,
     return String(route.period) === '601' ? '同期空缺 · 缺少600期对比营期数据' : '同期空缺';
   }
 
+  function periodComparisonFromFacts(actual, baseline) {
+    if (!actual || !baseline || finite(actual.value) == null || finite(baseline.value) == null) return null;
+    var currentValue = Number(actual.value);
+    var baselineValue = Number(baseline.value);
+    return {
+      baseline: baselineValue,
+      delta: currentValue - baselineValue,
+      relative: baselineValue ? (currentValue - baselineValue) / baselineValue : null
+    };
+  }
+
   function previousPeriodLabel(route) {
     return route.period === '601' ? '600期同阶段' : String(Number(route.period) - 1) + '期同阶段';
   }
@@ -211977,18 +211988,29 @@ body,
     [
       { metricId: 'live_attendance_rate', dayKey: 'D4', label: '第一场直播到课率' },
       { metricId: 'live_roster_completion_rate', dayKey: 'D4', label: '第一场直播完课率' },
-      { metricId: 'L3-011', dayKey: 'all', label: '整体转化率' }
+      { metricId: 'conversion_rate', fallbackMetricId: 'L3-011', dayKey: 'all', label: '整体转化率' }
     ].forEach(function (spec) {
       var fact = C.latestFact({
         period_id: String(route.period),
         day_key: spec.dayKey,
         metric_id: spec.metricId,
         dimension_type: 'all'
-      });
-      var comparison = comparisonFor(fact);
+      }) || (spec.fallbackMetricId ? C.latestFact({
+        period_id: String(route.period),
+        day_key: spec.dayKey,
+        metric_id: spec.fallbackMetricId,
+        dimension_type: 'all'
+      }) : null);
+      var baseline = fact ? C.latestFact({
+        period_id: String(Number(route.period) - 1),
+        day_key: spec.dayKey,
+        metric_id: fact.metric_id,
+        dimension_type: 'all'
+      }) : null;
+      var comparison = comparisonFor(fact) || periodComparisonFromFacts(fact, baseline);
       if (fact && comparison) {
         rows.push({
-          item: { metricId: spec.metricId, actual: fact, label: spec.label },
+          item: { metricId: fact.metric_id, actual: fact, label: spec.label },
           comparison: comparison
         });
       }
