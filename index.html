@@ -212315,13 +212315,11 @@ body,
 
   function renderStudentAnalysis(route) {
     var nodes = funnelNodes(route).filter(function (node) { return funnelGroup(node) === 'activation' || funnelGroup(node) === 'learning'; });
-    return '<section>' + sectionHead('学员分析', contextLabel(route) + ' · 总配额漏斗、班级激活明细、学员划分与代理商直播表现') +
+    return '<section>' + sectionHead('学员分析', contextLabel(route) + ' · 总配额漏斗、学员划分与代理商直播表现') +
       '<div class="card">' + (nodes.length ? '<div class="daily-metrics">' + nodes.slice(0, 8).map(function (node, index) {
         return funnelNodeCard(node, index ? nodes[index - 1] : null, route, false);
       }).join('') + '</div>' : '<div class="context-note"><strong>' + copy(themeFor(route.day).title) + '</strong><p>' +
-        copy(themeFor(route.day).focus + ' 当前页先保留聚合阶段，未展开个人记录。') + '</p></div>') + '</div>' +
-      '<div class="section learner-breakdown-stack">' + classActivationFunnelTable(route) + '</div>' +
-      '<div class="section learner-breakdown-stack">' + learnerBreakdownTable(route, 'segment', '学员划分直播表现') +
+        copy(themeFor(route.day).focus + ' 当前页先保留聚合阶段，未展开个人记录。') + '</p></div>') + '</div>' +      '<div class="section learner-breakdown-stack">' + learnerBreakdownTable(route, 'segment', '学员划分直播表现') +
       learnerBreakdownTable(route, 'agent', '代理商/渠道直播表现') + '</div>' +
       operationContextCard(route, 'students', '学员分析口径') + '</section>';
   }
